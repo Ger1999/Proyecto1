@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Certus - Subida de Documentos</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f4f6f9;
+      margin: 0;
+      padding: 20px;
+    }
+
+    h2 {
+      text-align: center;
+      color: #2c3e50;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+    }
+
+    .boton-salida {
+      display: inline-block;
+      margin: 10px auto;
+      background-color: #e74c3c;
+      color: white;
+      padding: 10px 18px;
+      text-decoration: none;
+      border-radius: 8px;
+      font-weight: bold;
+      font-size: 15px;
+      text-align: center;
+      cursor: pointer;
+      border: none;
+    }
+
+    .boton-salida:hover {
+      background-color: #c0392b;
+    }
+
+    .btn-admin {
+      background-color: #27ae60;
+      color: white;
+      padding: 10px 18px;
+      border: none;
+      border-radius: 8px;
+      font-weight: bold;
+      cursor: pointer;
+      margin-left: 10px;
+    }
+
+    .btn-admin:hover {
+      background-color: #219150;
+    }
+
+    .doc-card {
+      background: #fff;
+      border: 1px solid #dcdde1;
+      border-radius: 8px;
+      padding: 15px;
+      margin-top: 15px;
+    }
+
+    .doc-previews {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 15px;
+      margin-top: 10px;
+    }
+
+    iframe {
+      border: 1px solid #bdc3c7;
+      border-radius: 5px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Bienvenido a la Plataforma</h2>
+    <p class="subtitulo" id="saludo-usuario">Sube tus documentos requeridos</p>
+
+    <form id="form-subida">
+      <label for="dni">DNI (PDF o Imagen):</label><br>
+      <input type="file" id="dni" id="dni" accept=".pdf,.jpg,.jpeg,.png" required><br><br>
+
+      <label for="certificado">Certificado de Estudios:</label><br>
+      <input type="file" id="certificado" accept=".pdf,.jpg,.jpeg,.png" required><br><br>
+
+      <label for="fotocarnet">Foto Carnet:</label><br>
+      <input type="file" id="fotocarnet" accept=".pdf,.jpg,.jpeg,.png" required><br><br>
+
+      <button type="submit">Subir Documentos</button>
+    </form>
+
+    <div id="mensaje-subida" style="margin-top: 20px;"></div>
+
+    <div id="opciones" style="margin-top: 20px;">
+      <button onclick="cerrarSesion()" class="boton-salida">Cerrar sesión</button>
+    </div>
+
+    //Sección para mostrar documentos si es el usuario administrador
+    <div id="seccion-admin" style="display: none; margin-top: 30px;">
+      <h3>Documentos Registrados en el Navegador</h3>
+      <div id="lista-documentos"></div>
+    </div>
+  </div>
+
+  <script>
+    // Verificar autenticación
+    const usuarioActual = localStorage.getItem('usuarioLogueado');
+
+    if (!usuarioActual) {
+      window.location.href = 'index.html'; // Si no inició sesión, redirigir
+    } else {
+      document.getElementById('saludo-usuario').textContent = `Sesión activa: ${usuarioActual}`;
+    }
+
+    // Configuración para el usuario admin
+    if (usuarioActual === 'Fernanda@certus.edu.pe') {
+      const btnVer = document.createElement('button');
+      btnVer.textContent = 'Ver Documentos Subidos';
+      btnVer.className = 'btn-admin';
+      btnVer.onclick = mostrarDocumentosAdmin;
+      document.getElementById('opciones').appendChild(btnVer);
+    }
+
+    // Función auxiliar para transformar los archivos subidos a DataURL
+    function archivoABase64(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = error => reject(error);
+      });
+    }
+
+    // Guardar documentos en localStorage
+    document.getElementById('form-subida').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const dniFile = document.getElementById('dni').files[0];
+      const certFile = document.getElementById('certificado').files[0];
+      const fotoFile = document.getElementById('fotocarnet').files[0];
+      const mensajeDiv = document.getElementById('mensaje-subida');
+
+      try {
+        const dniB64 = await archivoABase64(dniFile);
+        const certB64 = await archivoABase64(certFile);
+        const fotoB64 = await archivoABase64(fotoFile);
+
+        const nuevoRegistro = {
+          id: Date.now(),
+          usuario: usuarioActual,
+          dni: dniB64,
+          certificado: certB64,
+          fotocarnet: fotoB64
+        };
+
+        const documentosGuardados = JSON.parse(localStorage.getItem('documentosUsuarios')) || [];
+        documentosGuardados.push(nuevoRegistro);
+        localStorage.setItem('documentosUsuarios', JSON.stringify(documentosGuardados));
+
+        mensajeDiv.innerHTML = '<p style="color: green;"> Documentos guardados correctamente en el navegador.</p>';
+        document.getElementById('form-subida').reset();
+      } catch (err) {
+        mensajeDiv.innerHTML = '<p style="color: red;"> Error al procesar los archivos.</p>';
+      }
+    });
+
+    // Función para visualizar los documentos guardados (Administrador)
+    function mostrarDocumentosAdmin() {
+      const seccion = document.getElementById('seccion-admin');
+      const contenedor = document.getElementById('lista-documentos');
+      seccion.style.display = 'block';
+
+      const documentos = JSON.parse(localStorage.getItem('documentosUsuarios')) || [];
+
+      if (documentos.length === 0) {
+        contenedor.innerHTML = '<p>No hay documentos registrados aún.</p>';
+        return;
+      }
+
+      let html = '';
+      documentos.forEach(doc => {
+        html += `
+          <div class="doc-card">
+            <strong>Usuario:</strong> ${doc.usuario}<br>
+            <div class="doc-previews">
+              <div>
+                <p><strong>DNI:</strong></p>
+                <iframe src="${doc.dni}" width="200" height="220"></iframe>
+              </div>
+              <div>
+                <p><strong>Certificado:</strong></p>
+                <iframe src="${doc.certificado}" width="200" height="220"></iframe>
+              </div>
+              <div>
+                <p><strong>Foto Carnet:</strong></p>
+                <iframe src="${doc.fotocarnet}" width="200" height="220"></iframe>
+              </div>
+            </div>
+          </div>
+        `;
+      });
+
+      contenedor.innerHTML = html;
+    }
+
+    // Cerrar sesión
+    function cerrarSesion() {
+      localStorage.removeItem('usuarioLogueado');
+      window.location.href = 'index.html';
+    }
+  </script>
+</body>
+</html>
